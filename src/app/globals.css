@@ -1,26 +1,207 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Civic Ledger design tokens.
+   Paper, ink, and one seal-red accent: the look of a printed public record,
+   not a SaaS dashboard. */
+@theme {
+  --color-paper: #f5f0e6;
+  --color-paper-2: #ece5d5;
+  --color-paper-3: #e2d9c4;
+  --color-ink: #16130e;
+  --color-ink-2: #443e34;
+  --color-muted: #7a715f;
+  --color-rule: #d3c9b3;
+  --color-rule-2: #bfb39a;
+  --color-seal: #b3392c;
+  --color-seal-2: #8f2c22;
+  --color-blue: #1f4f7a;
+  --color-green: #2f6b3a;
+  --color-amber: #a86b0a;
+  --color-plum: #6b3f78;
+
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --shadow-lift: 0 1px 0 rgba(22, 19, 14, 0.06), 0 8px 24px -12px rgba(22, 19, 14, 0.25);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-feature-settings: "kern", "liga", "ss01";
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #f0c9a0;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
+  letter-spacing: -0.01em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ruled paper: a thin double rule used as a section divider */
+.rule-double {
+  border-top: 1px solid var(--color-ink);
+  position: relative;
+}
+.rule-double::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  border-top: 1px solid var(--color-ink);
+}
+
+.hairline {
+  border-color: var(--color-rule);
+}
+
+/* Small caps labels used for eyebrows and table headers */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Category chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-rule-2);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-ink-2);
+  background: transparent;
+}
+.chip[data-on="true"] {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border-color: var(--color-ink);
+}
+.chip .dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--cat, var(--color-muted));
+}
+
+/* Outcome stamps — like the rubber stamp on a filed document */
+.stamp {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  transform: rotate(-1deg);
+}
+
+/* Category color scale */
+[data-cat="budget"] { --cat: #a86b0a; }
+[data-cat="contracts"] { --cat: #7a715f; }
+[data-cat="housing"] { --cat: #b3392c; }
+[data-cat="zoning"] { --cat: #6b3f78; }
+[data-cat="transportation"] { --cat: #1f4f7a; }
+[data-cat="public-safety"] { --cat: #8f2c22; }
+[data-cat="parks"] { --cat: #2f6b3a; }
+[data-cat="utilities"] { --cat: #2b6f7a; }
+[data-cat="health"] { --cat: #b0576b; }
+[data-cat="environment"] { --cat: #4f7d2a; }
+[data-cat="governance"] { --cat: #4a443b; }
+[data-cat="ceremonial"] { --cat: #bfb39a; }
+[data-cat="other"] { --cat: #9c927e; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: transform 120ms ease, background 120ms ease;
+}
+.btn:hover { background: #2a251c; }
+.btn:active { transform: translateY(1px); }
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink);
+}
+.btn-ghost:hover { background: var(--color-paper-2); }
+.btn-seal { background: var(--color-seal); border-color: var(--color-seal); }
+.btn-seal:hover { background: var(--color-seal-2); }
+
+.input {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-rule-2);
+  background: #fffdf8;
+  color: var(--color-ink);
+  font-size: 0.9375rem;
+  outline: none;
+}
+.input:focus { border-color: var(--color-ink); box-shadow: 0 0 0 3px rgba(22, 19, 14, 0.08); }
+
+.card {
+  background: #fbf8f1;
+  border: 1px solid var(--color-rule);
+  border-radius: 10px;
+}
+
+.prose-plain p + p { margin-top: 0.75em; }
+
+/* Leaflet tweaks so the map matches the paper palette */
+.leaflet-container { background: var(--color-paper-2); font-family: var(--font-sans); }
+.leaflet-popup-content-wrapper { border-radius: 8px; background: #fbf8f1; color: var(--color-ink); box-shadow: var(--shadow-lift); }
+.leaflet-popup-tip { background: #fbf8f1; }
+.leaflet-tile { filter: saturate(0.35) contrast(0.95) sepia(0.15); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 300ms ease both; }
+
+@keyframes blink { 50% { opacity: 0.2; } }
+.cursor-blink { animation: blink 1s steps(1) infinite; }
+
+@media print {
+  nav, .no-print { display: none !important; }
+  html { background: white; }
 }

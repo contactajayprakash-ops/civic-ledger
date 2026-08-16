@@ -1,0 +1,148 @@
+// Cities the ingest CLI knows how to build. Any Legistar client works —
+// adding a city is one line here plus one `npm run ingest` run.
+// Coordinates are city-hall-ish centroids used for the map's initial view.
+
+import type { City } from "./types";
+
+export type CityDef = Omit<City, "bodies" | "window" | "generatedAt"> & {
+  bodiesPattern?: RegExp; // which meeting bodies to keep (default: /council/i)
+};
+
+export const CITY_REGISTRY: CityDef[] = [
+  {
+    slug: "pittsburgh",
+    name: "Pittsburgh",
+    state: "PA",
+    country: "US",
+    lat: 40.4406,
+    lng: -79.9959,
+    population: 303255,
+    source: { kind: "legistar", client: "pittsburgh", url: "https://pittsburgh.legistar.com", label: "Pittsburgh City Council (Legistar)" },
+    bodiesPattern: /^city council$/i,
+  },
+  {
+    slug: "madison",
+    name: "Madison",
+    state: "WI",
+    country: "US",
+    lat: 43.0731,
+    lng: -89.4012,
+    population: 280305,
+    source: { kind: "legistar", client: "madison", url: "https://madison.legistar.com", label: "Madison Common Council (Legistar)" },
+    bodiesPattern: /^common council$/i,
+  },
+  {
+    slug: "oakland",
+    name: "Oakland",
+    state: "CA",
+    country: "US",
+    lat: 37.8044,
+    lng: -122.2712,
+    population: 436504,
+    source: { kind: "legistar", client: "oakland", url: "https://oakland.legistar.com", label: "Oakland City Council (Legistar)" },
+    bodiesPattern: /city council/i,
+  },
+  {
+    slug: "denver",
+    name: "Denver",
+    state: "CO",
+    country: "US",
+    lat: 39.7392,
+    lng: -104.9903,
+    population: 715522,
+    source: { kind: "legistar", client: "denver", url: "https://denver.legistar.com", label: "Denver City Council (Legistar)" },
+    bodiesPattern: /^city council$/i,
+  },
+  {
+    slug: "boston",
+    name: "Boston",
+    state: "MA",
+    country: "US",
+    lat: 42.3601,
+    lng: -71.0589,
+    population: 675647,
+    source: { kind: "legistar", client: "boston", url: "https://boston.legistar.com", label: "Boston City Council (Legistar)" },
+    bodiesPattern: /^city council$/i,
+  },
+  {
+    slug: "seattle",
+    name: "Seattle",
+    state: "WA",
+    country: "US",
+    lat: 47.6062,
+    lng: -122.3321,
+    population: 755078,
+    source: { kind: "legistar", client: "seattle", url: "https://seattle.legistar.com", label: "Seattle City Council (Legistar)" },
+    bodiesPattern: /^city council$/i,
+  },
+  {
+    slug: "milwaukee",
+    name: "Milwaukee",
+    state: "WI",
+    country: "US",
+    lat: 43.0389,
+    lng: -87.9065,
+    population: 561385,
+    source: { kind: "legistar", client: "milwaukee", url: "https://milwaukee.legistar.com", label: "Milwaukee Common Council (Legistar)" },
+    bodiesPattern: /^common council$/i,
+  },
+  {
+    slug: "phoenix",
+    name: "Phoenix",
+    state: "AZ",
+    country: "US",
+    lat: 33.4484,
+    lng: -112.074,
+    population: 1650070,
+    source: { kind: "legistar", client: "phoenix", url: "https://phoenix.legistar.com", label: "Phoenix City Council (Legistar)" },
+    bodiesPattern: /formal|city council/i,
+  },
+  {
+    slug: "san-jose",
+    name: "San José",
+    state: "CA",
+    country: "US",
+    lat: 37.3382,
+    lng: -121.8863,
+    population: 969655,
+    source: { kind: "legistar", client: "sanjose", url: "https://sanjose.legistar.com", label: "San José City Council (Legistar)" },
+    bodiesPattern: /^city council$/i,
+  },
+  {
+    slug: "sacramento",
+    name: "Sacramento",
+    state: "CA",
+    country: "US",
+    lat: 38.5816,
+    lng: -121.4944,
+    population: 524943,
+    source: { kind: "legistar", client: "sacramento", url: "https://sacramento.legistar.com", label: "Sacramento City Council (Legistar)" },
+    bodiesPattern: /^city council$/i,
+  },
+  {
+    slug: "mesa",
+    name: "Mesa",
+    state: "AZ",
+    country: "US",
+    lat: 33.4152,
+    lng: -111.8315,
+    population: 511648,
+    source: { kind: "legistar", client: "mesa", url: "https://mesa.legistar.com", label: "Mesa City Council (Legistar)" },
+    bodiesPattern: /^city council$/i,
+  },
+  {
+    slug: "alameda",
+    name: "Alameda",
+    state: "CA",
+    country: "US",
+    lat: 37.7652,
+    lng: -122.2416,
+    population: 78280,
+    source: { kind: "legistar", client: "alameda", url: "https://alameda.legistar.com", label: "Alameda City Council (Legistar)" },
+    bodiesPattern: /city council/i,
+  },
+];
+
+export function cityDef(slug: string) {
+  return CITY_REGISTRY.find((c) => c.slug === slug) || null;
+}
