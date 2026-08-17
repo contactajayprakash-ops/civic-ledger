@@ -105,7 +105,7 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
           const body = await res.text().catch(() => "");
           // A spent daily quota (Groq: "tokens per day", "requests per day")
           // won't clear by waiting; move on to the next model.
-          if (res.status === 429 && /per day|TPD|RPD|daily/i.test(body)) {
+          if (res.status === 429 && /per ?day|TPD|RPD|daily/i.test(body)) {
             exhausted.add(model);
             if (cfg.models.some((m) => !exhausted.has(m))) continue;
             throw new Error(`LLM daily quota exhausted for all models: ${cfg.models.join(", ")}`);
@@ -168,7 +168,7 @@ export async function* chatStream(messages: ChatMessage[], opts: ChatOptions = {
     const body = await res.text().catch(() => "");
     if (res.status === 429) {
       // A spent daily quota is sticky; a per-minute limit only skips this call.
-      if (/per day|TPD|RPD|daily/i.test(body)) exhausted.add(model);
+      if (/per ?day|TPD|RPD|daily/i.test(body)) exhausted.add(model);
       else skipThisCall.add(model);
       if (cfg.models.some((m) => !exhausted.has(m) && !skipThisCall.has(m))) continue;
     }
