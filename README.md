@@ -6,8 +6,12 @@ Council agendas and minutes are public, but they're long, written in legal boile
 
 Built for **Reverie Hacks 2026** (Software Development track).
 
-- **Live site:** _(Vercel URL — see below)_
-- **Demo city:** Pittsburgh, PA — 14 council meetings, 345 decisions, ~$200M in authorizations, May–Aug 2026.
+- **Live site:** https://civic-ledger-wine.vercel.app
+- **Demo video (3 min):** https://youtu.be/75pyH6MbzkI
+- **Devpost:** https://devpost.com/software/civic-ledger-nuok92
+- **Demo city:** Pittsburgh, PA — 14 council meetings, 345 decisions, ~$156M in authorizations, May–Aug 2026.
+
+![Civic Ledger](docs/demo/logo-card.png)
 
 ---
 

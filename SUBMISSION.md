@@ -11,7 +11,7 @@ I went looking for what my city council actually voted on last month and ended u
 
 ## What it does
 
-Civic Ledger reads a city council's official record and rewrites it so anyone can use it. For Pittsburgh it currently covers 14 meetings and 345 decisions from the last three months — about $198M in authorizations. Each item gets a one-to-three sentence plain-language summary, who it affects, a topic, and the headline dollar figure, while the votes, dates and file numbers stay locked to the record.
+Civic Ledger reads a city council's official record and rewrites it so anyone can use it. For Pittsburgh it currently covers 14 meetings and 345 decisions from the last three months — about $156M in authorizations. Each item gets a one-to-three sentence plain-language summary, who it affects, a topic, and the headline dollar figure, while the votes, dates and file numbers stay locked to the record.
 
 On top of that one dataset it gives you six ways in: an overview that ranks the decisions that mattered most (dollars, contested votes, failures — not agenda order); a filterable browser over every item; a money view with a week-by-week spending timeline; a votes view with a per-member scorecard and every non-unanimous roll call; a map of items that name a street, park or intersection, with "what was decided near me"; and Ask, a retrieval-grounded chat that answers questions from the snapshot and cites item numbers you can click. There's also a printable weekly digest and a per-city RSS feed.
 
@@ -33,7 +33,7 @@ The data itself fights you too. Legistar publishes Draft and Final records of th
 
 ## Accomplishments that I'm proud of
 
-The before/after is real: "Resolution authorizing, pursuant to Ch. 210…" becomes "Highmark Health will give Pittsburgh $20 million over five years to buy medical equipment for first responders." And the receipts survive the rewrite — every item page shows the roll call by name, the source excerpt, and a link to the original file. I also like that the whole thing found the two contested votes of Pittsburgh's summer automatically: 98% of roll calls were unanimous, and the interesting 2% surface themselves.
+The before/after is real: "Resolution authorizing, pursuant to Ch. 210…" becomes "Highmark Health will give Pittsburgh $20 million over five years to buy medical equipment for first responders." And the receipts survive the rewrite — every item page shows the roll call by name, the source excerpt, and a link to the original file. I also like that the whole thing found the handful of contested votes in Pittsburgh's summer automatically: 98% of roll calls were unanimous, and the interesting 2% surface themselves.
 
 ## What I learned
 
