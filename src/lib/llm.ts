@@ -269,8 +269,48 @@ export function parseJson<T = unknown>(text: string): T | null {
     try {
       return JSON.parse(c.slice(start, end + 1)) as T;
     } catch {
-      // try next candidate
+      const repaired = repairTruncatedJson(c.slice(start));
+      if (repaired) return repaired as T;
     }
   }
   return null;
+}
+
+// A response cut off mid-object can usually be saved: keep everything up to
+// the last completely-closed value, then close the brackets still open there.
+function repairTruncatedJson(s: string): unknown | null {
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  let lastSafe = -1;
+  let safeStack: string[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (esc) {
+      esc = false;
+      continue;
+    }
+    if (ch === "\\") {
+      esc = true;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = !inStr;
+      continue;
+    }
+    if (inStr) continue;
+    if (ch === "{" || ch === "[") stack.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") {
+      stack.pop();
+      lastSafe = i;
+      safeStack = [...stack];
+    }
+  }
+  if (lastSafe < 0) return null;
+  const candidate = s.slice(0, lastSafe + 1) + safeStack.reverse().join("");
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    return null;
+  }
 }

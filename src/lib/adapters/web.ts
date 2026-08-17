@@ -15,16 +15,20 @@ const Extracted = z.object({
   items: z
     .array(
       z.object({
-        title: z.string().min(4).max(240),
-        plain: z.string().min(10).max(600),
-        outcome: z.enum(["passed", "failed", "referred", "held", "withdrawn", "introduced", "discussed", "unknown"]),
-        vote: z.string().max(60).nullable().optional(),
-        category: z.enum(CATEGORIES as [Category, ...Category[]]),
-        money_amount: z.number().nullable().optional(),
-        money_kind: z.enum(["spend", "receive", "transfer", "budget", "unknown"]).nullable().optional(),
-        who_it_affects: z.string().max(200).nullable().optional(),
-        location: z.string().max(140).nullable().optional(),
-        quote: z.string().max(400).nullable().optional(),
+        title: z.string().min(4).transform((v) => v.slice(0, 240)),
+        plain: z.string().optional().nullable().transform((v) => (v ? v.slice(0, 600) : v)),
+        outcome: z.string().max(60),
+        vote: z.string().nullable().optional().transform((v) => (v ? v.slice(0, 60) : v)),
+        category: z.enum(CATEGORIES as [Category, ...Category[]]).optional().nullable().catch(null),
+        money_amount: z.coerce.number().nullable().optional().catch(null),
+        money_kind: z.enum(["spend", "receive", "transfer", "budget", "unknown"]).nullable().optional().catch(null),
+        who_it_affects: z.string().nullable().optional().transform((v) => (v ? v.slice(0, 200) : v)),
+        location: z.string().nullable().optional().transform((v) => (v ? v.slice(0, 140) : v)),
+        quote: z
+          .string()
+          .nullable()
+          .optional()
+          .transform((v) => (v ? v.slice(0, 400) : v)),
       }),
     )
     .max(40),
@@ -85,9 +89,12 @@ export async function extractFromDocument(
           content: `Document: ${doc.title}\nURL: ${doc.url}\nCity: ${opts.cityName}\nPart ${i + 1} of ${chunks.length}.\n\n${chunks[i]}\n\nReturn JSON: {"meeting_body": string|null, "meeting_date": "YYYY-MM-DD"|null, "items": [{"title","plain","outcome","vote","category","money_amount","money_kind","who_it_affects","location","quote"}]}.\n- "plain": 1–2 sentences in plain English.\n- "outcome": passed|failed|referred|held|withdrawn|introduced|discussed|unknown (what happened at THIS meeting).\n- "vote": like "7-2" or "unanimous" or null.\n- "category": one of ${CATEGORIES.join(", ")}.\n- "quote": the exact sentence from the document that supports the outcome, or null.`,
         },
       ],
-      { json: true, maxTokens: 2200, temperature: 0.1, signal: opts.signal },
+      { json: true, maxTokens: 6000, temperature: 0.1, signal: opts.signal },
     );
-    const parsed = Extracted.safeParse(parseJson(raw));
+    let json = parseJson(raw);
+    // Some models return the items array bare, without the wrapper object.
+    if (Array.isArray(json)) json = { items: json };
+    const parsed = Extracted.safeParse(json);
     if (!parsed.success) {
       opts.onChunk?.(i + 1, chunks.length, matters.length);
       continue;
@@ -98,16 +105,17 @@ export async function extractFromDocument(
       const key = slugify(it.title).slice(0, 60);
       if (seen.has(key)) continue;
       seen.add(key);
+      const outcome = normalizeOutcome(it.outcome);
       const tally = parseVote(it.vote || "");
-      const heuristicMoney = extractMoney(it.title, it.plain);
+      const heuristicMoney = extractMoney(it.title, it.plain || undefined);
       const m: Matter = {
         id: `${meetingId}-${hash(key)}`,
         file: `${date || "undated"} · item ${matters.length + 1}`,
         type: guessType(it.title),
         title: it.title.trim(),
-        plain: it.plain.trim(),
+        plain: (it.plain || "").trim() || undefined,
         whoItAffects: it.who_it_affects || undefined,
-        category: it.category === "other" ? classify(it.title, undefined, it.plain) : it.category,
+        category: !it.category || it.category === "other" ? classify(it.title, undefined, it.plain || "") : it.category,
         tags: [],
         money:
           it.money_amount && it.money_amount > 0
@@ -116,15 +124,15 @@ export async function extractFromDocument(
         location: it.location ? { text: it.location } : undefined,
         sponsors: [],
         status: it.outcome,
-        latestOutcome: it.outcome,
+        latestOutcome: outcome,
         decidedOn: date || undefined,
         actions: [
           {
             meetingId,
             date: date || "",
             body,
-            action: it.vote ? `${labelOutcome(it.outcome)} (${it.vote})` : labelOutcome(it.outcome),
-            outcome: it.outcome,
+            action: it.vote ? `${labelOutcome(outcome)} (${it.vote})` : labelOutcome(outcome),
+            outcome,
             votes: [],
             tally: tally || undefined,
           },
@@ -155,6 +163,18 @@ export async function extractFromDocument(
     status: "Extracted",
   };
   return { meeting, matters, chunks: chunks.length };
+}
+
+function normalizeOutcome(o: string): Matter["latestOutcome"] {
+  const v = (o || "").toLowerCase();
+  if (/withdraw/.test(v)) return "withdrawn";
+  if (/refer|committee|first reading/.test(v)) return "referred";
+  if (/held|hold|postpone|tabl|defer|continu/.test(v)) return "held";
+  if (/fail|defeat|denied|reject|not pass/.test(v)) return "failed";
+  if (/pass|adopt|approv|enact|carri|grant|accept|final/.test(v)) return "passed";
+  if (/introduc|present/.test(v)) return "introduced";
+  if (/discuss|hear|report|read/.test(v)) return "discussed";
+  return "unknown";
 }
 
 function parseVote(v: string) {
