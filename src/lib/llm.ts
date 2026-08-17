@@ -86,7 +86,7 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
   if (!cfg) throw new Error("No language model configured (set FEATHERLESS_API_KEY)");
   return getGate(cfg.concurrency).run(async () => {
     let lastErr: unknown;
-    for (let attempt = 0; attempt < 6; attempt++) {
+    for (let attempt = 0; attempt < 8; attempt++) {
       const model = activeModel(cfg, opts.model);
       try {
         const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
@@ -110,9 +110,12 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
             if (cfg.models.some((m) => !exhausted.has(m))) continue;
             throw new Error(`LLM daily quota exhausted for all models: ${cfg.models.join(", ")}`);
           }
-          const retryAfter = Number(res.headers.get("retry-after"));
-          const wait = (retryAfter ? retryAfter * 1000 : 0) || 1500 * 2 ** attempt;
-          await sleep(Math.min(wait, 30000));
+          // Groq spells out the wait: "Please try again in 7m41.4s" / "in 23.5s".
+          const m = body.match(/try again in (?:(\d+)m)?([\d.]+)s/);
+          const suggested = m ? (Number(m[1] || 0) * 60 + parseFloat(m[2])) * 1000 : 0;
+          const retryAfter = Number(res.headers.get("retry-after")) * 1000 || 0;
+          const wait = Math.max(suggested, retryAfter) || 1500 * 2 ** attempt;
+          await sleep(Math.min(wait + 500, 90000));
           lastErr = new Error(`LLM ${res.status}: ${body.slice(0, 200)}`);
           continue;
         }
@@ -125,7 +128,7 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
           throw new Error(`LLM ${res.status}: ${body.slice(0, 300)}`);
         }
         const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-        return data.choices?.[0]?.message?.content ?? "";
+        return stripThinking(data.choices?.[0]?.message?.content ?? "");
       } catch (e) {
         lastErr = e;
         if ((e as Error).name === "AbortError") throw e;
@@ -137,22 +140,41 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
 }
 
 // Streams assistant text as it arrives. Yields plain text deltas.
+// Fails over to the next configured model when one's daily quota is spent.
 export async function* chatStream(messages: ChatMessage[], opts: ChatOptions = {}): AsyncGenerator<string> {
   const cfg = llmConfig();
   if (!cfg) throw new Error("No language model configured (set FEATHERLESS_API_KEY)");
-  const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey}` },
-    signal: opts.signal,
-    body: JSON.stringify({
-      model: activeModel(cfg, opts.model),
-      messages,
-      temperature: opts.temperature ?? 0.3,
-      max_tokens: opts.maxTokens ?? 700,
-      stream: true,
-    }),
-  });
-  if (!res.ok || !res.body) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  let res: Response | null = null;
+  const skipThisCall = new Set<string>();
+  for (let attempt = 0; attempt < cfg.models.length + 1; attempt++) {
+    const preferred = attempt === 0 ? opts.model : undefined;
+    const model =
+      (preferred && !exhausted.has(preferred) && !skipThisCall.has(preferred) && preferred) ||
+      cfg.models.find((m) => !exhausted.has(m) && !skipThisCall.has(m)) ||
+      cfg.models[0];
+    res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey}` },
+      signal: opts.signal,
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: opts.temperature ?? 0.3,
+        max_tokens: opts.maxTokens ?? 700,
+        stream: true,
+      }),
+    });
+    if (res.ok) break;
+    const body = await res.text().catch(() => "");
+    if (res.status === 429) {
+      // A spent daily quota is sticky; a per-minute limit only skips this call.
+      if (/per day|TPD|RPD|daily/i.test(body)) exhausted.add(model);
+      else skipThisCall.add(model);
+      if (cfg.models.some((m) => !exhausted.has(m) && !skipThisCall.has(m))) continue;
+    }
+    throw new Error(`LLM ${res.status}: ${body.slice(0, 300)}`);
+  }
+  if (!res || !res.ok || !res.body) throw new Error(`LLM unavailable after trying: ${cfg.models.join(", ")}`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
@@ -176,6 +198,62 @@ export async function* chatStream(messages: ChatMessage[], opts: ChatOptions = {
       }
     }
   }
+}
+
+// Reasoning models sometimes prepend their scratchpad in <think> tags,
+// or emit it bare before the answer. Keep only the part meant for people.
+export function stripThinking(text: string) {
+  let out = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  const open = out.search(/<think>/i);
+  if (open >= 0) out = out.slice(0, open); // unterminated block: drop the tail
+  // A leading "Here's a thinking process..." style preamble followed by the
+  // real answer after a blank line + no more meta-language.
+  return out.trim();
+}
+
+// Wraps a delta stream, holding back anything inside <think>…</think>.
+export async function* stripThinkingStream(deltas: AsyncGenerator<string>): AsyncGenerator<string> {
+  let buf = "";
+  let inThink = false;
+  let started = false;
+  for await (const d of deltas) {
+    buf += d;
+    while (buf) {
+      if (inThink) {
+        const end = buf.search(/<\/think>/i);
+        if (end < 0) {
+          buf = buf.slice(-9); // keep a tail in case the closing tag is split
+          break;
+        }
+        buf = buf.slice(end + 8);
+        inThink = false;
+        if (!started) buf = buf.replace(/^\s+/, "");
+        continue;
+      }
+      const start = buf.search(/<think>/i);
+      if (start >= 0) {
+        const before = buf.slice(0, start);
+        if (before) {
+          started = true;
+          yield before;
+        }
+        buf = buf.slice(start + 7);
+        inThink = true;
+        continue;
+      }
+      // No tag in sight; hold back a small tail in case "<think" is split.
+      if (buf.length > 8) {
+        const emit = buf.slice(0, -8);
+        buf = buf.slice(-8);
+        if (emit) {
+          started = true;
+          yield emit;
+        }
+      }
+      break;
+    }
+  }
+  if (buf && !inThink) yield buf;
 }
 
 // Models sometimes wrap JSON in prose or code fences. Dig it out.

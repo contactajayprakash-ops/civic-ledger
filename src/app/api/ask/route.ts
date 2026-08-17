@@ -1,6 +1,6 @@
 import { loadCity } from "@/lib/store";
 import { searchMatters } from "@/lib/search";
-import { chatStream, llmAvailable, type ChatMessage } from "@/lib/llm";
+import { chatStream, stripThinkingStream, llmAvailable, type ChatMessage } from "@/lib/llm";
 import { formatMoney } from "@/lib/heuristics";
 import { fmtDate } from "@/lib/format";
 import type { Matter } from "@/lib/types";
@@ -20,8 +20,14 @@ export async function POST(req: Request) {
 
   // Widen the net with words from the previous turn so follow-ups work.
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content || "";
-  let hits = searchMatters(snap, q, 10);
-  if (hits.length < 4 && lastUser) hits = [...hits, ...searchMatters(snap, `${q} ${lastUser}`, 8).filter((m) => !hits.includes(m))].slice(0, 10);
+  let hits = searchMatters(snap, q, 14);
+  if (hits.length < 4 && lastUser) hits = [...hits, ...searchMatters(snap, `${q} ${lastUser}`, 8).filter((m) => !hits.includes(m))].slice(0, 14);
+  // Proclamations drown out real business unless the question is about them.
+  if (!/proclamat|ceremon|honor|commend|recogni/i.test(q)) {
+    const substantive = hits.filter((m) => m.category !== "ceremonial");
+    if (substantive.length >= 2) hits = substantive;
+  }
+  hits = hits.slice(0, 10);
   if (hits.length === 0) {
     // Fall back to the most consequential recent items so the model can at
     // least explain what it does have.
@@ -51,7 +57,7 @@ ${context}`;
     async start(controller) {
       controller.enqueue(encoder.encode(JSON.stringify({ sources }) + "\n"));
       try {
-        for await (const delta of chatStream(messages, { maxTokens: 500, temperature: 0.2 })) {
+        for await (const delta of stripThinkingStream(chatStream(messages, { maxTokens: 500, temperature: 0.2 }))) {
           controller.enqueue(encoder.encode(JSON.stringify({ delta }) + "\n"));
         }
       } catch (e) {
